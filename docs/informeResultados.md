@@ -43,6 +43,7 @@ Se ejecutó una prueba de carga sobre el servicio **App Transaction Balance** co
 |---|---|
 | Promedio | 1.86 s |
 | Mediana | 1.61 s |
+| Mínimo | 0 s |
 | Máximo | 30.94 s |
 | p(90) | 2.29 s |
 | p(95) | 2.57 s |
@@ -62,15 +63,15 @@ Se ejecutó una prueba de carga sobre el servicio **App Transaction Balance** co
 
 El gráfico de monitoreo muestra la relación entre los **usuarios virtuales (VUs)** y el **número de peticiones por segundo (http_reqs/s)** a lo largo de la prueba:
 
-- **VUs constantes a 140:** A lo largo de toda la prueba, los VUs se mantienen **constantes en 140**, sin una rampa de escalado progresivo. Esto indica que la prueba fue configurada con carga fija (o con un ramp-up inicial muy breve), manteniendo la concurrencia máxima durante prácticamente toda la ejecución.
+- **VUs mayormente constantes a 140 (con ramp-up breve):** La prueba inicia con **2 VUs** y escala rápidamente hasta **140 VUs**, manteniéndose en ese nivel durante la mayor parte de la ejecución. El ramp-up es breve, por lo que la concurrencia máxima de 140 se sostiene durante prácticamente toda la prueba.
 
-- **Fluctuaciones en el throughput (~01:40 – 02:00):** A pesar de que los 140 VUs permanecen activos de forma constante, la tasa de peticiones por segundo fluctúa notablemente entre **50 y 100 req/s**, con caídas pronunciadas alrededor de las 01:50. Esto evidencia que el sistema no logra mantener un throughput estable bajo la carga constante de 140 usuarios concurrentes.
+- **Inestabilidad del throughput con caídas severas (~01:40 – 02:00):** A pesar de que los 140 VUs permanecen activos de forma constante, la tasa de peticiones por segundo fluctúa notablemente entre **50 y 100 req/s**. Entre ~01:47 y ~01:55 se observan **caídas severas cercanas a 0 req/s**, consistentes con los **5,987 errores HTTP 5xx** concentrados en el Stage 1, señalando episodios de indisponibilidad del servicio. Estas caídas son consecuencia directa de la degradación del servidor: al aumentar los tiempos de respuesta bajo estrés, el throughput efectivo disminuye (throughput ≈ VUs / tiempo de respuesta promedio).
 
-- **Captura en carga sostenida (02:02:00):** Con los **140 VUs** activos, la tasa registrada es de **~82.6 req/s**. Dado que los VUs son constantes, la tasa de peticiones debería ser también estable; sin embargo, las oscilaciones del throughput confirman que el servidor se satura de forma intermitente, incrementando los tiempos de respuesta y reduciendo el rendimiento efectivo.
+- **Captura en carga sostenida (02:02:00):** Con los **140 VUs** activos, la tasa registrada es de **~82.6 req/s**. Las oscilaciones del throughput confirman que el servidor se satura de forma intermitente, incrementando los tiempos de respuesta y reduciendo el rendimiento efectivo.
 
-- **Caídas abruptas del throughput (~02:05 – 02:35):** Se observan **caídas recurrentes y severas** en las peticiones por segundo, llegando a valores cercanos a 0, mientras los VUs se mantienen en 140. Estas caídas son consistentes con los **5,987 errores HTTP 5xx** concentrados en el Stage 1, señalando episodios de indisponibilidad o degradación severa del servicio bajo carga sostenida.
+- **Estabilización posterior (~02:05 en adelante):** A partir de ~02:05, el throughput se estabiliza en torno a **75-90 req/s** sin caídas tan pronunciadas, sugiriendo que el sistema logra recuperarse parcialmente tras los episodios de fallo.
 
-- **Correlación inversa bajo estrés:** Aunque los VUs permanecen constantemente en 140, el throughput (req/s) presenta caídas pronunciadas, evidenciando un cuello de botella en el servidor que impide atender peticiones de forma eficiente bajo esta concurrencia fija.
+- **Divergencia VUs vs. throughput bajo estrés:** Aunque los VUs permanecen fijos en 140, el throughput (req/s) presenta caídas pronunciadas. Esta divergencia evidencia un cuello de botella en el servidor que impide atender peticiones de forma eficiente bajo esta concurrencia.
 
 ---
 
@@ -82,7 +83,7 @@ El gráfico de monitoreo muestra la relación entre los **usuarios virtuales (VU
 
 3. **Errores HTTP 5xx dominantes:** Los errores de servidor (5xx) representan el **88.6%** del total de fallos, sugiriendo problemas de capacidad, timeouts o excepciones no controladas en el backend.
 
-4. **Throughput no escala con los VUs:** A pesar de tener 140 VUs, la tasa efectiva promedio fue de **73.18 req/s**, y en el pico de carga se registró solo **82.6 req/s**. Esto revela un techo de rendimiento del sistema.
+4. **Throughput bajo para 140 VUs concurrentes:** Con 140 VUs activos, la tasa efectiva promedio fue de solo **73.18 req/s**, y en el pico de carga se registró **82.6 req/s**. Esto sugiere un techo de rendimiento del sistema en torno a los 80-85 req/s bajo esta concurrencia.
 
 5. **Caídas intermitentes del servicio:** El diagrama de monitoreo muestra múltiples caídas abruptas del throughput a valores cercanos a cero, indicando momentos de **indisponibilidad parcial o total** del servicio.
 
@@ -94,7 +95,7 @@ El gráfico de monitoreo muestra la relación entre los **usuarios virtuales (VU
 
 1. El servicio **App Transaction Balance** logra una tasa de éxito del 97.55%, pero esta cifra es insuficiente para un servicio transaccional crítico donde se espera un SLA superior al 99.5%.
 
-2. El sistema presenta un **techo de rendimiento** alrededor de los 80-85 req/s, independientemente de la cantidad de usuarios concurrentes. Al superar este umbral, los tiempos de respuesta se degradan drásticamente y comienzan a producirse errores 5xx en cascada.
+2. Con 140 VUs concurrentes, el sistema presenta un **techo de rendimiento** alrededor de los 80-85 req/s. Los tiempos de respuesta se degradan drásticamente y se producen errores 5xx en cascada, lo que sugiere que esta concurrencia supera la capacidad efectiva del servicio.
 
 3. La **estabilidad del servicio se compromete bajo carga sostenida**, como lo evidencian las caídas intermitentes observadas en el diagrama de monitoreo y la concentración masiva de errores 5xx en el Stage 1.
 
