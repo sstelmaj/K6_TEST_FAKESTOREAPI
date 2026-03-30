@@ -62,13 +62,15 @@ Se ejecutó una prueba de carga sobre el servicio **App Transaction Balance** co
 
 El gráfico de monitoreo muestra la relación entre los **usuarios virtuales (VUs)** y el **número de peticiones por segundo (http_reqs/s)** a lo largo de la prueba:
 
-- **Fase de ramp-up (~01:35 – 01:55):** Los VUs escalan progresivamente hasta alcanzar el pico de **140 VUs**. Durante esta fase, la tasa de peticiones fluctúa entre **50 y 100 req/s**, con caídas notables alrededor de las 01:50, lo que sugiere que el sistema empezó a experimentar presión antes de llegar a la carga máxima.
+- **VUs constantes a 140:** A lo largo de toda la prueba, los VUs se mantienen **constantes en 140**, sin una rampa de escalado progresivo. Esto indica que la prueba fue configurada con carga fija (o con un ramp-up inicial muy breve), manteniendo la concurrencia máxima durante prácticamente toda la ejecución.
 
-- **Fase de carga máxima (~01:55 – 02:05):** Con **140 VUs** activos y una tasa registrada de **~82.6 req/s** (captura a las 02:02:00), la tasa de peticiones no escala proporcionalmente al número de usuarios. Esto indica que el servidor comenzó a saturarse, incrementando los tiempos de respuesta y reduciendo el throughput efectivo.
+- **Fluctuaciones en el throughput (~01:40 – 02:00):** A pesar de que los 140 VUs permanecen activos de forma constante, la tasa de peticiones por segundo fluctúa notablemente entre **50 y 100 req/s**, con caídas pronunciadas alrededor de las 01:50. Esto evidencia que el sistema no logra mantener un throughput estable bajo la carga constante de 140 usuarios concurrentes.
 
-- **Fase de sostenimiento y ramp-down (~02:05 – 02:35):** Se observan **caídas abruptas y recurrentes** tanto en VUs como en peticiones por segundo. Estas caídas a valores cercanos a 0 son consistentes con los **5,987 errores HTTP 5xx** concentrados en el Stage 1, señalando episodios de indisponibilidad o degradación severa del servicio bajo carga sostenida.
+- **Captura en carga sostenida (02:02:00):** Con los **140 VUs** activos, la tasa registrada es de **~82.6 req/s**. Dado que los VUs son constantes, la tasa de peticiones debería ser también estable; sin embargo, las oscilaciones del throughput confirman que el servidor se satura de forma intermitente, incrementando los tiempos de respuesta y reduciendo el rendimiento efectivo.
 
-- **Correlación inversa bajo estrés:** Mientras los VUs se mantienen altos, el throughput (req/s) decrece, evidenciando un cuello de botella en el servidor que impide atender peticiones de forma eficiente cuando la concurrencia supera cierto umbral.
+- **Caídas abruptas del throughput (~02:05 – 02:35):** Se observan **caídas recurrentes y severas** en las peticiones por segundo, llegando a valores cercanos a 0, mientras los VUs se mantienen en 140. Estas caídas son consistentes con los **5,987 errores HTTP 5xx** concentrados en el Stage 1, señalando episodios de indisponibilidad o degradación severa del servicio bajo carga sostenida.
+
+- **Correlación inversa bajo estrés:** Aunque los VUs permanecen constantemente en 140, el throughput (req/s) presenta caídas pronunciadas, evidenciando un cuello de botella en el servidor que impide atender peticiones de forma eficiente bajo esta concurrencia fija.
 
 ---
 
@@ -76,7 +78,7 @@ El gráfico de monitoreo muestra la relación entre los **usuarios virtuales (VU
 
 1. **Degradación bajo carga alta:** El tiempo de respuesta máximo alcanzó **29.93 segundos**, lo cual es inaceptable para una transacción de consulta de balance. El promedio de 861 ms y el p95 de 1.57 s también son elevados.
 
-2. **Concentración de errores en Stage 1:** El **98.9% de los errores** (6,756 de 6,759) se produjeron en el Stage 1, con **5,987 errores HTTP 5xx** (errores del servidor) y **769 errores HTTP 4xx** (errores de cliente). Esto indica que el sistema colapsa bajo la fase de mayor carga.
+2. **Concentración de errores en Stage 1:** El **99.96% de los errores** (6,756 de 6,759) se produjeron en el Stage 1, con **5,987 errores HTTP 5xx** (errores del servidor) y **769 errores HTTP 4xx** (errores de cliente). Esto indica que el sistema colapsa bajo la fase de mayor carga.
 
 3. **Errores HTTP 5xx dominantes:** Los errores de servidor (5xx) representan el **88.6%** del total de fallos, sugiriendo problemas de capacidad, timeouts o excepciones no controladas en el backend.
 
