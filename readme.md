@@ -19,14 +19,21 @@ Script de prueba de rendimiento con **Grafana K6** que evalúa el endpoint de au
 ## Estructura del Proyecto
 
 ```
-K6_SCRIPT_FAKESTOREAPI/
-├── script.js              # Script principal de K6
-├── users.csv              # Credenciales parametrizadas (5 usuarios)
-├── readme.md              # Instrucciones de ejecución (este archivo)
-├── conclusiones.md        # Hallazgos y conclusiones del Ejercicio 1
-├── InformeResultados.md   # Análisis de resultados del Ejercicio 2
-├── textSummary.txt        # Resumen de métricas (generado tras ejecución)
-└── summary.json           # Datos crudos en JSON (generado tras ejecución)
+K6_TEST_FAKESTOREAPI/
+├── README.md                       # Instrucciones de ejecución (este archivo)
+├── data/
+│   └── users.csv                   # Credenciales parametrizadas (5 usuarios)
+├── tests/
+│   ├── login_load_test.js          # Script principal de carga K6
+│   ├── test_users.js               # Validación manual de usuarios
+│   ├── test_csv_users.js           # Validación de usuarios desde CSV
+│   └── test_debug.js               # Test de debug / smoke test
+├── results/
+│   ├── textSummary.txt             # Resumen de métricas (generado tras ejecución)
+│   └── summary.json                # Datos crudos en JSON (generado tras ejecución)
+└── docs/
+    ├── conclusiones.md             # Hallazgos y conclusiones del Ejercicio 1
+    └── informeResultados.md        # Análisis de resultados del Ejercicio 2
 ```
 
 ---
@@ -70,17 +77,17 @@ k6 version
 ### 1. Clonar el repositorio
 ```bash
 git clone <URL_DEL_REPOSITORIO>
-cd K6_SCRIPT_FAKESTOREAPI
+cd K6_TEST_FAKESTOREAPI
 ```
 
 ### 2. Verificar que el CSV esté presente
 ```bash
-cat users.csv
+cat data/users.csv
 ```
 Debe mostrar:
 ```
 user,passwd
-donero,evedon
+donero,ewedon
 kevinryan,kev02937@
 johnd,m38rmF$
 derek,jklg*_56
@@ -89,24 +96,27 @@ mor_2314,83r5^_
 
 ### 3. Ejecutar la prueba
 ```bash
-k6 run script.js
+k6 run tests/login_load_test.js
 ```
 
 ### 4. Revisar resultados
-Al finalizar, se generan automáticamente:
-- `textSummary.txt` — resumen legible en consola
-- `summary.json` — métricas completas en JSON
+Al finalizar, se generan automáticamente en `results/`:
+- `results/textSummary.txt` — resumen legible en consola
+- `results/summary.json` — métricas completas en JSON
 
 ---
 
 ## Configuración del Escenario
 
+Se utiliza el executor **`constant-arrival-rate`** (open model) para inyectar exactamente 20 peticiones por segundo, independientemente del tiempo de respuesta del servidor.
+
 | Parámetro | Valor | Descripción |
 |-----------|-------|-------------|
-| **Ramp-up** | 0→30 VUs en 30s | Calentamiento gradual |
-| **Meseta** | 60 VUs durante 2m | Carga sostenida para alcanzar 20+ TPS |
-| **Sostenido** | 60 VUs durante 1m | Estado estacionario |
-| **Ramp-down** | 60→0 VUs en 30s | Enfriamiento |
+| **Executor** | `constant-arrival-rate` | Tasa de llegada fija (open model) |
+| **Rate** | 20 iter/s | 20 peticiones por segundo garantizadas |
+| **Duración** | 3 minutos | Tiempo total de la prueba |
+| **VUs pre-asignados** | 50 | Pool inicial de usuarios virtuales |
+| **VUs máximos** | 100 | Límite superior si se necesitan más VUs |
 
 ### Thresholds (SLAs)
 
@@ -115,15 +125,31 @@ Al finalizar, se generan automáticamente:
 | `http_req_duration` | `p(95) < 1500ms` | El 95% de las peticiones debe responder en menos de 1.5s |
 | `http_req_failed` | `rate < 0.03` | La tasa de error debe ser menor al 3% |
 
+### Checks Funcionales
+
+| Check | Validación |
+|-------|------------|
+| Login exitoso (status 2xx) | Status HTTP entre 200 y 299 |
+| Response contiene token | El body JSON incluye un campo `token` |
+| Tiempo de respuesta < 1500ms | Latencia individual menor a 1.5s |
+| Response no vacío | El body de la respuesta no está vacío |
+
+### Métricas Custom
+
+| Métrica | Tipo | Descripción |
+|---------|------|-------------|
+| `login_fail_rate` | Rate | Porcentaje de logins con status distinto a 200/201 |
+| `login_duration` | Trend | Distribución de tiempos de respuesta del login |
+
 ---
 
 ## Datos de Prueba
 
-Los datos se parametrizan desde `users.csv` usando `SharedArray` de `k6/data`. Cada VU selecciona un usuario por distribución round-robin.
+Los datos se parametrizan desde `data/users.csv` usando `SharedArray` de `k6/data`. Cada VU selecciona un usuario por distribución round-robin (`__VU % users.length`).
 
 | Usuario | Contraseña |
 |---------|------------|
-| donero | evedon |
+| donero | ewedon |
 | kevinryan | kev02937@ |
 | johnd | m38rmF$ |
 | derek | jklg*_56 |
@@ -135,7 +161,7 @@ Los datos se parametrizan desde `users.csv` usando `SharedArray` de `k6/data`. C
 
 | Problema | Solución |
 |----------|----------|
-| `SharedArray: file not found` | Verificar que `users.csv` está en la misma carpeta que `script.js` |
-| `connection reset by peer` | El servidor aplica rate limiting; reducir VUs |
+| `SharedArray: file not found` | Verificar que `data/users.csv` existe y se ejecuta desde la raíz del proyecto |
+| `connection reset by peer` | El servidor aplica rate limiting; reducir el `rate` en el escenario |
 | `threshold crossed` | Revisar `textSummary.txt` para identificar qué SLA se incumple |
 | `GOPROXY connection timed out` | Verificar conexión a internet |
